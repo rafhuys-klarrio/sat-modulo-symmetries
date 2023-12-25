@@ -29,8 +29,10 @@ void CadicalSolver::init(SolverConfig config, cnf_t &cnf)
     // solver->set("lucky", 0);
     if (config.turnOffInprocessing)
         solver->set("inprocessing", 0);
-    // solver->set("log", 1);
-    // solver->set("debug", 1);
+    solver->set("log", 1);
+    solver->set("debug", 1);
+    solver->set ("veripb", 4);
+    solver->trace_proof ("/tmp/veripb.proof");
 
     // register propagator first
     solver->connect_external_propagator(this);

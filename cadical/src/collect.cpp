@@ -119,6 +119,33 @@ void Internal::protect_reasons () {
     count++;
 #endif
   }
+  int l = 0;
+  for (auto &t : trails) {
+    l++;
+    assert (l <= level);
+    for (auto &lit : t) {
+      if (!active (lit))
+        continue;
+      assert (val (lit));
+      Var &v = var (lit);
+      if (v.level < l)
+        continue;
+      assert (v.level == l);
+      assert (v.level > 0);
+      Clause *reason = v.reason;
+      if (!reason)
+        continue;
+      if (reason == external_reason)
+        continue;
+      LOG (reason, "protecting assigned %d reason %p", lit,
+           (void *) reason);
+      assert (!reason->reason);
+      reason->reason = true;
+#ifdef LOGGING
+      count++;
+#endif
+    }
+  }
   LOG ("protected %zd reason clauses referenced on trail", count);
   protected_reasons = true;
 }
@@ -152,6 +179,33 @@ void Internal::unprotect_reasons () {
 #ifdef LOGGING
     count++;
 #endif
+  }
+  int l = 0;
+  for (auto &t : trails) {
+    l++;
+    assert (l <= level);
+    for (auto &lit : t) {
+      if (!active (lit))
+        continue;
+      assert (val (lit));
+      Var &v = var (lit);
+      if (v.level < l)
+        continue;
+      assert (v.level == l);
+      assert (v.level > 0);
+      Clause *reason = v.reason;
+      if (!reason)
+        continue;
+      if (reason == external_reason)
+        continue;
+      LOG (reason, "unprotecting assigned %d reason %p", lit,
+           (void *) reason);
+      assert (reason->reason);
+      reason->reason = false;
+#ifdef LOGGING
+      count++;
+#endif
+    }
   }
   LOG ("unprotected %zd reason clauses referenced on trail", count);
   protected_reasons = false;
@@ -205,6 +259,7 @@ inline void Internal::flush_watches (int lit, Watches &saved) {
       c = w.clause = c->copy;
     w.size = c->size;
     const int new_blit_pos = (c->literals[0] == lit);
+    LOG (c, "clause in flush_watch starting from %d", lit);
     assert (c->literals[!new_blit_pos] == lit); /*FW1*/
     w.blit = c->literals[new_blit_pos];
     if (w.binary ())
@@ -255,6 +310,32 @@ void Internal::update_reason_references () {
 #ifdef LOGGING
     count++;
 #endif
+  }
+  int l = 0;
+  for (auto &t : trails) {
+    l++;
+    assert (l <= level);
+    for (auto &lit : t) {
+      if (!active (lit))
+        continue;
+      Var &v = var (lit);
+      if (v.level < l)
+        continue;
+      assert (v.level == l);
+      Clause *c = v.reason;
+      if (!c)
+        continue;
+      if (c == external_reason)
+        continue;
+      LOG (c, "updating assigned %d reason", lit);
+      assert (c->reason);
+      assert (c->moved);
+      Clause *d = c->copy;
+      v.reason = d;
+#ifdef LOGGING
+      count++;
+#endif
+    }
   }
   LOG ("updated %zd assigned reason references", count);
 }
@@ -458,6 +539,62 @@ void Internal::check_clause_stats () {
   assert (stats.current.total == total);
   assert (stats.irrlits == irrlits);
 #endif
+}
+
+/*------------------------------------------------------------------------*/
+
+// only delete binary clauses from watch list that are already mark as
+// deleted.
+void Internal::remove_garbage_binaries () {
+  if (unsat)
+    return;
+  START (collect);
+
+  if (!protected_reasons)
+    protect_reasons ();
+  int backtrack_level = level + 1;
+  Watches saved;
+  for (auto v : vars) {
+    for (auto lit : {-v, v}) {
+      assert (saved.empty ());
+      Watches &ws = watches (lit);
+      const const_watch_iterator end = ws.end ();
+      watch_iterator j = ws.begin ();
+      const_watch_iterator i;
+      for (i = j; i != end; i++) {
+        Watch w = *i;
+        Clause *c = w.clause;
+        if (c->reason && c->collect ()) {
+          assert (c->size == 2);
+          backtrack_level =
+              min (backtrack_level, var (c->literals[0]).level);
+          LOG ("need to backtrack to before level %d", backtrack_level);
+        }
+        if (c->collect ())
+          continue;
+        assert (!c->moved);
+        w.size = c->size;
+        const int new_blit_pos = (c->literals[0] == lit);
+        LOG (c, "clause in flush_watch starting from %d", lit);
+        assert (c->literals[!new_blit_pos] == lit); /*FW1*/
+        w.blit = c->literals[new_blit_pos];
+        if (w.binary ())
+          *j++ = w;
+        else
+          saved.push_back (w);
+      }
+      ws.resize (j - ws.begin ());
+      for (const auto &w : saved)
+        ws.push_back (w);
+      saved.clear ();
+      shrink_vector (ws);
+    }
+  }
+  delete_garbage_clauses ();
+  unprotect_reasons ();
+  if (backtrack_level - 1 < level)
+    backtrack (backtrack_level - 1);
+  STOP (collect);
 }
 
 /*------------------------------------------------------------------------*/

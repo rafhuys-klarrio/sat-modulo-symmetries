@@ -17,7 +17,7 @@ rm -f configure.log
 all=no
 debug=no
 libs=""
-logging=no
+logging=yes
 check=no
 competition=no
 coverage=no
@@ -55,6 +55,8 @@ die () {
   cecho "${BOLD}configure:${NORMAL} ${BAD}error:${NORMAL} $*${checklog}"
   exit 1
 }
+
+rm -f configure.log
 
 msg () {
   cecho "${BOLD}configure:${NORMAL} $*"

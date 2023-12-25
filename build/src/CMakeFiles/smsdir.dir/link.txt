@@ -1,0 +1,2 @@
+/usr/bin/ar qc libsmsdir.a CMakeFiles/smsdir.dir/minimalityCheck_dir.cpp.o CMakeFiles/smsdir.dir/minimalityCheckCommon.cpp.o CMakeFiles/smsdir.dir/sms.cpp.o CMakeFiles/smsdir.dir/cadicalSMS.cpp.o CMakeFiles/smsdir.dir/useful.cpp.o CMakeFiles/smsdir.dir/connectedComponents.cpp.o CMakeFiles/smsdir.dir/coloring.cpp.o CMakeFiles/smsdir.dir/connectedChecker.cpp.o CMakeFiles/smsdir.dir/planarity.cpp.o CMakeFiles/smsdir.dir/coloringCheck.cpp.o CMakeFiles/smsdir.dir/forbiddenSubgraph.cpp.o CMakeFiles/smsdir.dir/universal.cpp.o
+/usr/bin/ranlib libsmsdir.a

@@ -295,6 +295,7 @@ bool GraphSolver::checkPartiallyDefined(bool isFullyDefined)
   }
   catch (const forbidden_graph_t forbiddenGraph)
   {
+    printf("Forbidden graph found. Add clause to SAT solver\n");
     addClause(theClauseThatBlocks(forbiddenGraph), false); // TODO eventually vector with checkers which are redundant and which are not; only makes sense when supported by Cadical
     return false;
   }

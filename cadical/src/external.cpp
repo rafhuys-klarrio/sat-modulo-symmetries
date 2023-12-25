@@ -1,11 +1,12 @@
 #include "internal.hpp"
+#include <cstdint>
 
 namespace CaDiCaL {
 
 External::External (Internal *i)
     : internal (i), max_var (0), vsize (0), extended (false),
-      terminator (0), learner (0), propagator (0), solution (0),
-      vars (max_var) {
+      concluded (false), terminator (0), learner (0), propagator (0),
+      solution (0), vars (max_var) {
   assert (internal);
   assert (!internal->external);
   internal->external = this;
@@ -41,6 +42,9 @@ void External::init (int new_max_var) {
   if (!max_var) {
     assert (e2i.empty ());
     e2i.push_back (0);
+    ext_units.push_back (0);
+    ext_units.push_back (0);
+    ext_flags.push_back (0);
     assert (internal->i2e.empty ());
     internal->i2e.push_back (0);
   } else {
@@ -53,6 +57,9 @@ void External::init (int new_max_var) {
     LOG ("mapping external %u to internal %u", eidx, iidx);
     assert (e2i.size () == eidx);
     e2i.push_back (iidx);
+    ext_units.push_back (0);
+    ext_units.push_back (0);
+    ext_flags.push_back (0);
     internal->i2e.push_back (eidx);
     assert (internal->i2e[iidx] == (int) eidx);
     assert (e2i[eidx] == (int) iidx);
@@ -64,6 +71,7 @@ void External::init (int new_max_var) {
       moltentab.resize (1 + (size_t) new_max_var, false);
   assert (iidx == (size_t) new_internal_max_var + 1);
   assert (eidx == (size_t) new_max_var + 1);
+  assert (ext_units.size () == (size_t) new_max_var * 2 + 2);
   max_var = new_max_var;
 }
 
@@ -72,6 +80,11 @@ void External::init (int new_max_var) {
 void External::reset_assumptions () {
   assumptions.clear ();
   internal->reset_assumptions ();
+}
+
+void External::reset_concluded () {
+  concluded = false;
+  internal->reset_concluded ();
 }
 
 void External::reset_constraint () {
@@ -140,13 +153,32 @@ void External::add (int elit) {
       (internal->opts.checkwitness || internal->opts.checkfailed))
     original.push_back (elit);
 
-  // The external literals of the new clause must be saved for later
-  // when the proof is printed during add_original_lit (0)
-  if (elit && internal->proof)
-    eclause.push_back (elit);
-
   const int ilit = internalize (elit);
   assert (!elit == !ilit);
+
+  // The external literals of the new clause must be saved for later
+  // when the proof is printed during add_original_lit (0)
+  if (elit && internal->proof) {
+    eclause.push_back (elit);
+    if (internal->lrat) {
+      // actually find unit of -elit (flips elit < 0)
+      unsigned eidx = (elit > 0) + 2u * (unsigned) abs (elit);
+      assert ((size_t) eidx < ext_units.size ());
+      const uint64_t id = ext_units[eidx];
+      bool added = ext_flags[abs (elit)];
+      if (id && !added) {
+        ext_flags[abs (elit)] = true;
+        internal->lrat_chain.push_back (id);
+      }
+    }
+  }
+
+  if (!elit && internal->proof && internal->lrat) {
+    for (const auto &elit : eclause) {
+      ext_flags[abs (elit)] = false;
+    }
+  }
+
   if (elit)
     LOG ("adding external %d as internal %d", elit, ilit);
   internal->add_original_lit (ilit);
@@ -159,6 +191,8 @@ void External::add (int elit) {
 void External::assume (int elit) {
   assert (elit);
   reset_extended ();
+  if (internal->proof)
+    internal->proof->add_assumption (elit);
   assumptions.push_back (elit);
   const int ilit = internalize (elit);
   assert (ilit);
@@ -222,11 +256,14 @@ void External::constrain (int elit) {
   }
   assert (elit != INT_MIN);
   reset_extended ();
-  constraint.push_back (elit);
   const int ilit = internalize (elit);
   assert (!elit == !ilit);
   if (elit)
     LOG ("adding external %d as internal %d to constraint", elit, ilit);
+  else if (!elit && internal->proof) {
+    internal->proof->add_constraint (constraint);
+  }
+  constraint.push_back (elit);
   internal->constrain (ilit);
 }
 
@@ -345,8 +382,8 @@ void External::remove_observed_var (int elit) {
     int ilit = e2i[eidx]; // internalize (elit);
     internal->remove_observed_var (ilit);
 
-    melt (elit);
     is_observed[eidx] = false;
+    melt (elit);
     LOG ("unmarking %d as externally watched", eidx);
   }
 }
@@ -355,7 +392,14 @@ void External::reset_observed_vars () {
   // Shouldn't be called if there is no connected propagator
   assert (propagator);
   reset_extended ();
-  assert ((size_t) max_var + 1 == is_observed.size ());
+
+  internal->notified = 0;
+  LOG ("reset notified counter to 0");
+
+  if (!is_observed.size ())
+    return;
+
+  assert (!max_var || (size_t) max_var + 1 == is_observed.size ());
 
   for (auto elit : vars) {
     int eidx = abs (elit);
@@ -364,12 +408,10 @@ void External::reset_observed_vars () {
       int ilit = internalize (elit);
       internal->remove_observed_var (ilit);
       LOG ("unmarking %d as externally watched", eidx);
+      is_observed[eidx] = false;
       melt (elit);
     }
-    is_observed[eidx] = false;
   }
-  internal->notified = 0;
-  LOG ("reset notified counter to 0");
 }
 
 bool External::observed (int elit) {
@@ -542,10 +584,16 @@ void External::melt (int elit) {
   unsigned &ref = frozentab[eidx];
   assert (ref > 0);
   if (ref < UINT_MAX) {
-    if (!--ref)
-      LOG ("external variable %d melted once and now completely melted",
-           eidx);
-    else
+    if (!--ref) {
+      if (observed (elit)) {
+        ref++;
+        LOG ("external variable %d is observed, can not be completely "
+             "molten",
+             eidx);
+      } else
+        LOG ("external variable %d melted once and now completely melted",
+             eidx);
+    } else
       LOG ("external variable %d melted once but remains frozen %u times",
            eidx, ref);
   } else
@@ -629,8 +677,7 @@ void External::check_failing () {
   if (internal->opts.log)
     checker->set ("log", true);
 #endif
-  for (const auto lit : original)
-    checker->add (lit);
+
   for (const auto lit : assumptions) {
     if (!failed (lit))
       continue;
@@ -644,6 +691,12 @@ void External::check_failing () {
       checker->add (lit);
   } else if (constraint.size ())
     LOG (constraint, "constraint satisfied and ignored");
+
+  // Add original clauses as last step, failing () and failed_constraint ()
+  // might add more external clauses (due to lazy explanation)
+  for (const auto lit : original)
+    checker->add (lit);
+
   int res = checker->solve ();
   if (res != 20)
     FATAL ("failed assumptions do not form a core");
@@ -728,7 +781,6 @@ bool External::traverse_all_non_frozen_units_as_witnesses (
     return true;
 
   vector<int> clause_and_witness;
-
   for (auto idx : vars) {
     if (frozen (idx))
       continue;
@@ -736,8 +788,14 @@ bool External::traverse_all_non_frozen_units_as_witnesses (
     if (!tmp)
       continue;
     int unit = tmp < 0 ? -idx : idx;
+    const int ilit = e2i[idx] * (tmp < 0 ? -1 : 1);
+    // heurstically add + max_var to the id to avoid reusing ids
+    const uint64_t id = internal->opts.lrat
+                            ? internal->unit_clauses[internal->vlit (ilit)]
+                            : 1;
+    assert (id);
     clause_and_witness.push_back (unit);
-    if (!it.witness (clause_and_witness, clause_and_witness))
+    if (!it.witness (clause_and_witness, clause_and_witness, id + max_var))
       return false;
     clause_and_witness.clear ();
   }

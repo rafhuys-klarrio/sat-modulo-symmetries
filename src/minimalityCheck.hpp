@@ -3,6 +3,8 @@
 
 #include "useful.h"
 #include "graphChecker.hpp"
+#include <cstdint>
+#include <algorithm>
 
 class LimitReachedException
 {
