@@ -5,6 +5,7 @@
 #include <time.h>
 #include <iostream>
 #include <iomanip>
+#include <cstdint>
 
 using std::string;
 

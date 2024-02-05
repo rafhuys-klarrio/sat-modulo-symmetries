@@ -18,8 +18,8 @@ void checkMinimality(adjacency_matrix_t &adjacency_matrix, vertex_ordering_t ver
     if (MAXIMIZE)
     {
         auto adj_copy = adjacency_matrix; // avoid side effects by copying
-        // printf("Before:");
-        // printAdjacencyMatrix(adj_copy);
+        printf("Before:");
+        printAdjacencyMatrix(adj_copy, true);
         for (size_t i = 0; i < adjacency_matrix.size(); i++)
             for (size_t j = 0; j < adjacency_matrix.size(); j++)
             {
@@ -32,8 +32,8 @@ void checkMinimality(adjacency_matrix_t &adjacency_matrix, vertex_ordering_t ver
                     adj_copy[i][j] = truth_value_false;
                 }
             }
-        // printf("Complement:");
-        // printAdjacencyMatrix(adj_copy);
+        printf("Complement:");
+        printAdjacencyMatrix(adj_copy, true);
         int count = 0;
         isMinimal(vertex_ordering, config.initial_partition, 0, adj_copy, config, count);
     }
@@ -47,6 +47,11 @@ void checkMinimality(adjacency_matrix_t &adjacency_matrix, vertex_ordering_t ver
 
 void isMinimal(vertex_ordering_t vertices, partition_t partition, int row, adjacency_matrix_t &adjacency_matrix, minimalit_check_config_t config, int &count)
 {
+    printf("isMinimal: row %d , vertices: ", row);
+    for (auto v : vertices)
+        printf("%d ", v);
+    printf("\n");
+
     // PRINT_CURRENT_LINE
     count++;
     if (config.cutoff != 0 && count > config.cutoff)
@@ -62,6 +67,13 @@ void isMinimal(vertex_ordering_t vertices, partition_t partition, int row, adjac
 
     for (int i = row; i < n && (partition[i] == 0 || i == row); i++) // iter over vertices from partition.
     {
+        printf("i: %d, row: %d, partition: ", i, row);
+        for (auto b : partition)
+            if (b)
+                printf("1");
+            else
+                printf("0");
+        printf("\n");
 
         if (false) // check if for two in the partition vertices the neighborhood to the other vertices is the same
         {
@@ -102,6 +114,7 @@ void isMinimal(vertex_ordering_t vertices, partition_t partition, int row, adjac
         newVertices[row] = vertices[i];
         newVertices[i] = vertices[row];
 
+        printf("run isMinimalVertex\n");
         isMinimalVertex(newVertices, newPartition, row, adjacency_matrix, config, count);
     }
 }
@@ -109,24 +122,28 @@ void isMinimal(vertex_ordering_t vertices, partition_t partition, int row, adjac
 // Adapt the partition according the selected vertex for the row
 void isMinimalVertex(vertex_ordering_t vertices, partition_t partition, int row, adjacency_matrix_t &adjacency_matrix, minimalit_check_config_t config, int &count)
 {
-    // for (int i = 0; i < row; i++)
-    //     printf("   ");
-    // printf("Depth: %d\n", row);
-    // for (int i = 0; i < row; i++)
-    //     printf("   ");
-    // printf("permutation: ");
-    // for (auto v : vertices)
-    //     printf("%d ", v);
-    // printf("\n");
-    // for (int i = 0; i < row; i++)
-    //     printf("   ");
-    // printf("Partition: ");
-    // for (auto b : partition)
-    //     if (b)
-    //         printf("1");
-    //     else
-    //         printf("0");
-    // printf("\n");
+    for (int i = 0; i < row; i++)
+        printf("   ");
+    printAdjacencyMatrix(adjacency_matrix, false);
+
+    for (int i = 0; i < row; i++)
+        printf("   ");
+    printf("Depth: %d\n", row);
+    for (int i = 0; i < row; i++)
+        printf("   ");
+    printf("permutation: ");
+    for (auto v : vertices)
+        printf("%d ", v);
+    printf("\n");
+    for (int i = 0; i < row; i++)
+        printf("   ");
+    printf("Partition: ");
+    for (auto b : partition)
+        if (b)
+            printf("1");
+        else
+            printf("0");
+    printf("\n");
     vertex_t n = adjacency_matrix.size();
     vertex_t vertex = vertices[row];
     vertex_t col = row + 1; // current column
@@ -138,6 +155,9 @@ void isMinimalVertex(vertex_ordering_t vertices, partition_t partition, int row,
         vertex_t end;
         for (end = col + 1; end < n && partition[end] == 0; end++)
             ; // get the single partition
+        for (int i = 0; i < row; i++)
+            printf("   ");
+        printf("start: %d, end: %d\n", start, end);
 
         if (start + 1 == end) // single vertex partition as seperate case (minor improvement)
         {
@@ -163,6 +183,9 @@ void isMinimalVertex(vertex_ordering_t vertices, partition_t partition, int row,
                 }
                 return;
             }
+            for (int i = 0; i < row; i++)
+                printf("   ");
+            printf("state: %d, statePermutation: %d\n", state, statePermutation);
 
             if ((state == truth_value_unknown && statePermutation == truth_value_false) ||
                 (state == truth_value_true && statePermutation == truth_value_unknown) ||
@@ -194,7 +217,9 @@ void isMinimalVertex(vertex_ordering_t vertices, partition_t partition, int row,
         if (start + (vertex_t)notAdjacentList.size() < n) // create new partition containing all the non adjacent once.
             partition[start + notAdjacentList.size()] = 1;
 
-        // printf("%d,%d,%d,%d,%d,%d\n", start, nNotAdjacent, start + nNotAdjacent, nUnknown, start + nNotAdjacent + nUnknown, nAdjacent);
+        for (int i = 0; i < row; i++)
+            printf("   ");
+        printf("%d,%d,%d,%d,%d,%d\n", start, notAdjacentList.size(), start + notAdjacentList.size(), unknownList.size(), start + notAdjacentList.size() + unknownList.size(), adjacentList.size());
         std::copy(notAdjacentList.begin(), notAdjacentList.end(), &vertices[start]);
         std::copy(unknownList.begin(), unknownList.end(), &vertices[start + notAdjacentList.size()]);
         std::copy(adjacentList.begin(), adjacentList.end(), &vertices[start + notAdjacentList.size() + unknownList.size()]);
@@ -212,7 +237,7 @@ void isMinimalVertex(vertex_ordering_t vertices, partition_t partition, int row,
         // match undefined
         for (vertex_t i = start + notAdjacentList.size(); i < start + (vertex_t)(notAdjacentList.size() + unknownList.size()); i++)
         {
-            // printf("row: %d; col: %d\n", row, i);
+            printf("row: %d; col: %d\n", row, i);
             // PRINT_CURRENT_LINE
             if (adjacency_matrix[row][i] == truth_value_true)
             {
@@ -259,6 +284,8 @@ void isMinimalVertex(vertex_ordering_t vertices, partition_t partition, int row,
         col = end;
     }
 
+
+    printf("End of isMinimalVertex. Run isMinimal\n");
     return isMinimal(vertices, partition, row + 1, adjacency_matrix, config, count);
 }
 
@@ -275,12 +302,12 @@ int getElementFromArray(int *array, int n, int elem)
 
 void createClause(vertex_ordering_t &vertices, adjacency_matrix_t &adjacency_matrix, minimalit_check_config_t)
 {
-    /*
+    
     printf("Add new Clause:\n");
-    printAdjacencyMatrix(adjacency_matrix);
+    printAdjacencyMatrix(adjacency_matrix, false);
     for (int i = 0; i < adjacency_matrix.size(); i++)
         printf("%d ", vertices[i]);
-    printf("\n"); */
+    printf("\n"); 
 
     int n = adjacency_matrix.size();
     std::vector<signed_edge_t> edges;

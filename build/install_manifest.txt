@@ -1,0 +1,11 @@
+/usr/local/bin/smsg
+/usr/local/bin/smsd
+/usr/local/lib/libsms.a
+/usr/local/lib/libsmsdir.a
+/usr/local/lib/libcadical.a
+/usr/local/include/sms/sms.hpp
+/usr/local/include/sms/cadical.hpp
+/usr/local/include/sms/cadicalSMS.hpp
+/usr/local/include/sms/useful.h
+/usr/local/include/sms/graphChecker.hpp
+/usr/local/include/sms/minimalityCheck.hpp

@@ -2,6 +2,8 @@
 #include "cadical.hpp"
 #include <unordered_map>
 #include <cassert>
+#include <algorithm>
+#include <vector>
 
 class UniversalChecker : public ComplexFullyDefinedGraphChecker
 {

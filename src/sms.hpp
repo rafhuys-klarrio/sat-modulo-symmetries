@@ -73,7 +73,8 @@ public:
   FILE *addedClauses = NULL;
   FILE *addedColoringClauses = NULL;
 
-  bool quiet = true; // don't print any output
+  bool quiet = false; // don't print any output
+  bool logger = true;
 
   // symmetry breaking related part
 #define DEFAULT_FREQUENCY 20

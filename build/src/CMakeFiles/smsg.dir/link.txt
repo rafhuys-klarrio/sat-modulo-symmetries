@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wall -Wextra -pedantic -O3 -DNDEBUG CMakeFiles/smsg.dir/main.cpp.o -o smsg  /usr/local/lib/libboost_program_options.a /home/raf/Projects/vub/dmos/sat-modulo-symmetries/src/../cadical/build/libcadical.a libsms.a /usr/local/lib/libboost_program_options.a /home/raf/Projects/vub/dmos/sat-modulo-symmetries/src/../cadical/build/libcadical.a 
