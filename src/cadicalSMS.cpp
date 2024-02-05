@@ -50,6 +50,10 @@ void CadicalSolver::init(SolverConfig config, cnf_t &cnf)
     literal2clauseNeg = vector<vector<int>>(highestObservedVariables + 1);
 
     highestVariable = std::max(highestVariable, highestObservedVariables);
+
+    solver->start_proof(cnf.size());
+
+
     // add clauses to solver
     for (auto clause : cnf)
     {
@@ -74,6 +78,8 @@ void CadicalSolver::init(SolverConfig config, cnf_t &cnf)
     }
 
     initEdgeMemory();
+
+    
 }
 
 // add formula and register propagator
